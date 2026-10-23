@@ -1,0 +1,21 @@
+{
+  "name": "guestbook-monitoring",
+  "version": "1.0.0",
+  "description": "Kubernetes Guestbook with Prometheus and Grafana monitoring, managed by Pulumi",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "preview": "pulumi preview",
+    "up": "pulumi up",
+    "destroy": "pulumi destroy"
+  },
+  "dependencies": {
+    "@pulumi/kubernetes": "^4.28.0",
+    "@pulumi/pulumi": "^3.228.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "typescript": "^5.0.0"
+  },
+  "license": "MIT"
+}

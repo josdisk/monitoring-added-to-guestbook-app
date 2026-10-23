@@ -1,0 +1,14 @@
+name: guestbook-monitoring
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Guestbook application with Prometheus and Grafana monitoring on Kubernetes
+config:
+  guestbook-monitoring:isMinikube:
+    description: Set to true when deploying to minikube (uses NodePort/ClusterIP instead of LoadBalancer)
+    default: false
+  guestbook-monitoring:grafanaAdminPassword:
+    description: Initial Grafana admin password
+    default: guestbook-admin
+    secret: true
