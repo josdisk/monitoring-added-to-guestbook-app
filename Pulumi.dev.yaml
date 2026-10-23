@@ -1,2 +1,5 @@
 config:
-  guestbook-monitoring:isMinikube: "false"
+  guestbook-monitoring:isMinikube: "true"
+  guestbook-monitoring:grafanaAdminPassword:
+    secure: v1:wYrb38ZRNyDEdlDu:Ts3AS58Ck/AxHuvEmrpYhf2J6xFbvGOdySR39u4PpQ==
+encryptionsalt: v1:xvROBVRtbbw=:v1:KUjfKVgdMecE4Bud:w+zrdEMyuhKBzfBac2kVjTFVKYVdJQ==
