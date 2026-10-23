@@ -62,7 +62,8 @@ export class Frontend extends pulumi.ComponentResource {
                     labels,
                 },
                 spec: {
-                    replicas: 3,
+                    // Three replicas match the classic Guestbook tutorial; one is enough for a demo.
+                    replicas: isMinikube ? 1 : 3,
                     selector: { matchLabels: labels },
                     template: {
                         metadata: {

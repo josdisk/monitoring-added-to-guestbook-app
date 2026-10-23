@@ -63,13 +63,14 @@ export class MonitoringStack extends pulumi.ComponentResource {
                             serviceMonitorNamespaceSelector: {},
                             retention: "7d",
                             resources: {
-                                requests: { cpu: "200m", memory: "512Mi" },
-                                limits: { cpu: "1", memory: "2Gi" },
+                                requests: { cpu: "100m", memory: "256Mi" },
+                                limits: { cpu: "500m", memory: "1Gi" },
                             },
                         },
                     },
+                    // Alertmanager is optional for this exercise; disable to save resources.
                     alertmanager: {
-                        enabled: true,
+                        enabled: false,
                     },
                     grafana: {
                         enabled: true,
@@ -89,21 +90,7 @@ export class MonitoringStack extends pulumi.ComponentResource {
                                 searchNamespace: "ALL",
                             },
                         },
-                        // Pre-select Prometheus as the default datasource.
-                        datasources: {
-                            "datasources.yaml": {
-                                apiVersion: 1,
-                                datasources: [
-                                    {
-                                        name: "Prometheus",
-                                        type: "prometheus",
-                                        url: "http://kube-prometheus-stack-prometheus:9090",
-                                        access: "proxy",
-                                        isDefault: true,
-                                    },
-                                ],
-                            },
-                        },
+                        // Chart already provisions Prometheus as the default datasource.
                     },
                     // Keep the install lean for a demo cluster.
                     kubeEtcd: { enabled: false },
@@ -111,8 +98,8 @@ export class MonitoringStack extends pulumi.ComponentResource {
                     kubeScheduler: { enabled: false },
                     kubeProxy: { enabled: false },
                 },
-                // CRDs are large; give Helm enough time on first install.
-                timeout: 600,
+                // First install pulls many images; allow enough time on small clusters.
+                timeout: 900,
             },
             { ...childOpts, dependsOn: [this.namespace] },
         );
