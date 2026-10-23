@@ -4,7 +4,7 @@ Pulumi TypeScript project that deploys the classic [Kubernetes Guestbook](https:
 
 Based on the [Pulumi kubernetes-ts-guestbook](https://github.com/pulumi/examples/blob/master/kubernetes-ts-guestbook/README.md) example, extended with:
 
-- `kube-prometheus-stack` (Helm) for Prometheus, Alertmanager, and Grafana
+- `kube-prometheus-stack` (Helm) for Prometheus and Grafana (Alertmanager is disabled to keep the demo small)
 - nginx reverse proxy + `nginx-prometheus-exporter` on the frontend (request metrics)
 - `redis_exporter` for Redis metrics
 - `ServiceMonitor` resources so prometheus-operator discovers Guestbook targets
@@ -19,7 +19,7 @@ guestbook namespace
 └── redis-exporter
 
 monitoring namespace
-├── kube-prometheus-stack (Prometheus, Grafana, …)
+├── kube-prometheus-stack (Prometheus + Grafana)
 ├── ServiceMonitors → guestbook frontend & redis-exporter
 └── Grafana dashboard ConfigMap (auto-loaded by sidecar)
 ```
@@ -28,7 +28,8 @@ monitoring namespace
 
 - [Pulumi CLI](https://www.pulumi.com/docs/install/)
 - Node.js 18+
-- A Kubernetes cluster and a working `kubectl` context
+- A Kubernetes cluster and a working `kubectl` context  
+  (minikube works; aim for ~3 CPUs and ~6GB RAM so Prometheus/Grafana fit)
 - Helm is **not** required on your machine; Pulumi talks to the cluster API directly
 
 ## Deploy
@@ -37,22 +38,27 @@ monitoring namespace
 # 1. Install dependencies
 npm install
 
-# 2. Create / select a stack
+# 2. Log in to Pulumi (local file backend is fine for a demo)
+pulumi login --local
+# Local backend needs a passphrase in this shell:
+export PULUMI_CONFIG_PASSPHRASE='guestbook-demo'
+
+# 3. Create / select a stack
 pulumi stack init dev   # skip if the stack already exists
 pulumi stack select dev
 
-# 3. Point Pulumi at your cluster (uses current kubeconfig)
+# 4. Config
 # Optional: override the Grafana admin password
 pulumi config set --secret grafanaAdminPassword 'your-secure-password'
 
-# Minikube users:
+# Minikube users (NodePort instead of LoadBalancer; 1 frontend replica):
 pulumi config set isMinikube true
 
-# 4. Deploy
+# 5. Deploy
 pulumi up
 ```
 
-First install of `kube-prometheus-stack` can take several minutes while CRDs and pods come up.
+First install of `kube-prometheus-stack` can take several minutes while images pull and pods come up. The Helm release timeout is set to 15 minutes for smaller clusters.
 
 ## Grafana access
 
@@ -61,12 +67,12 @@ After a successful deploy:
 ```bash
 pulumi stack output grafanaUrl
 pulumi stack output grafanaAdminUsername
-pulumi stack output grafanaAdminPassword
+pulumi stack output grafanaAdminPassword --show-secrets
 ```
 
 | Item | Value |
 |------|--------|
-| URL | Stack output `grafanaUrl` (LoadBalancer on cloud; `http://$(minikube ip):32000` on minikube) |
+| URL | Stack output `grafanaUrl` (LoadBalancer on cloud; NodePort `32000` on minikube) |
 | Username | `admin` |
 | Password | Stack config `grafanaAdminPassword` (default: `guestbook-admin`) |
 
@@ -74,10 +80,32 @@ Open Grafana → **Dashboards** → **Guestbook Application**.
 
 If the LoadBalancer is still provisioning, `grafanaUrl` may show `pending`. Wait a minute and re-run `pulumi stack output grafanaUrl`.
 
-### Minikube tip
+### Reliable access via port-forward (recommended on minikube / Docker Desktop)
+
+`minikube service` can hang on Docker Desktop for macOS. Port-forward is the reliable path:
+
+```bash
+# Leave each command running in its own terminal
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 13000:80
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 19090:9090
+kubectl port-forward -n guestbook svc/frontend 18080:80
+```
+
+Then open:
+
+| Service | URL |
+|---------|-----|
+| Grafana | http://127.0.0.1:13000 (admin / guestbook-admin) |
+| Prometheus targets | http://127.0.0.1:19090/targets |
+| Guestbook app | http://127.0.0.1:18080 |
+
+Ports `13000` / `19090` / `18080` avoid common conflicts with local Grafana/Prometheus on `3000` / `9090`.
+
+### Minikube NodePort (optional)
 
 ```bash
 minikube service -n monitoring kube-prometheus-stack-grafana
+# Grafana NodePort is fixed at 32000 when isMinikube=true
 ```
 
 ## Guestbook frontend
@@ -86,7 +114,7 @@ minikube service -n monitoring kube-prometheus-stack-grafana
 pulumi stack output frontendUrl
 ```
 
-On cloud providers this is the LoadBalancer address. On minikube, use the NodePort from the frontend Service or `minikube service -n guestbook frontend`.
+On cloud providers this is the LoadBalancer URL. On minikube the output points you at NodePort / `minikube service`; the port-forward above is usually easier.
 
 ## Verify Prometheus is scraping Guestbook metrics
 
@@ -99,16 +127,10 @@ kubectl get servicemonitors -n monitoring
 
 ### 2. Check Prometheus targets
 
-Port-forward Prometheus:
+With the Prometheus port-forward running, open http://127.0.0.1:19090/targets and confirm these are **UP**:
 
-```bash
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
-```
-
-Open http://localhost:9090/targets and confirm these jobs are **UP**:
-
-- `guestbook-frontend` (nginx exporter on `:9113`)
-- `guestbook-redis` (redis exporter on `:9121`)
+- `serviceMonitor/monitoring/guestbook-frontend/0` (nginx exporter on `:9113`)
+- `serviceMonitor/monitoring/guestbook-redis/0` (redis exporter on `:9121`)
 
 ### 3. Run a few PromQL queries
 
@@ -125,11 +147,10 @@ redis_up{namespace="guestbook"}
 sum(rate(container_cpu_usage_seconds_total{namespace="guestbook", container!="", container!="POD"}[5m])) by (pod)
 ```
 
-Generate traffic if request metrics look empty:
+Generate traffic if request metrics look empty (with the frontend port-forward up):
 
 ```bash
-FRONTEND=$(pulumi stack output frontendUrl)
-for i in $(seq 1 50); do curl -s "$FRONTEND" >/dev/null; done
+for i in $(seq 1 50); do curl -s http://127.0.0.1:18080/ >/dev/null; done
 ```
 
 ### 4. Annotation-based discovery (backup path)
@@ -160,11 +181,14 @@ assets/
 ## Tear down
 
 ```bash
+export PULUMI_CONFIG_PASSPHRASE='guestbook-demo'   # if using local backend
 pulumi destroy
 ```
 
 ## Notes
 
-- Default Grafana password is fine for demos; change it for any shared cluster.
+- Default Grafana password (`guestbook-admin`) is fine for demos; change it for any shared cluster.
 - `kube-prometheus-stack` chart version is pinned (`65.1.0`) for reproducible installs.
-- Control-plane component scrapes (etcd, scheduler, …) are disabled to keep the demo footprint small.
+- Alertmanager and control-plane scrapes (etcd, scheduler, …) are disabled to keep the demo footprint small.
+- On minikube the frontend runs with 1 replica (3 on cloud) so the stack fits in ~6GB of cluster memory.
+- If a browser shows `ERR_CONNECTION_REFUSED`, the `kubectl port-forward` process for that port has stopped — start it again and retry.
