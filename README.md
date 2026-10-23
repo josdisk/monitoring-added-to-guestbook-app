@@ -192,3 +192,8 @@ pulumi destroy
 - Alertmanager and control-plane scrapes (etcd, scheduler, …) are disabled to keep the demo footprint small.
 - On minikube the frontend runs with 1 replica (3 on cloud) so the stack fits in ~6GB of cluster memory.
 - If a browser shows `ERR_CONNECTION_REFUSED`, the `kubectl port-forward` process for that port has stopped — start it again and retry.
+
+
+NOTE:
+I used Docker to run it locally 
+I also turned Alertmanager OFF to reduce local memory consumption, but you can turn it on and play around if you want.
