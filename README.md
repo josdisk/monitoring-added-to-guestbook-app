@@ -10,6 +10,24 @@ Based on the [Pulumi kubernetes-ts-guestbook](https://github.com/pulumi/examples
 - `ServiceMonitor` resources so prometheus-operator discovers Guestbook targets
 - A starter Grafana dashboard (request rate, Redis, pod CPU/memory)
 
+## Screenshots
+
+Guestbook UI (port-forward to `18080`):
+
+![Guestbook application](docs/screenshots/guestbook.jpg)
+
+Prometheus targets — Guestbook frontend and Redis exporters **UP**:
+
+![Prometheus targets](docs/screenshots/prometheus-targets.jpg)
+
+Grafana login (`admin` / `guestbook-admin`):
+
+![Grafana login](docs/screenshots/grafana-login.jpg)
+
+Grafana home after sign-in (Prometheus datasource ready):
+
+![Grafana home](docs/screenshots/grafana-home.jpg)
+
 ## Architecture
 
 ```
@@ -176,6 +194,7 @@ src/
 assets/
   nginx/proxy.conf       # frontend reverse proxy + stub_status
   dashboards/guestbook.json
+docs/screenshots/        # README screenshots
 ```
 
 ## Tear down
